@@ -1,5 +1,6 @@
 package com.example.kuit7th_api_practice.ui.post.viewmodel
 
+import android.R.attr.value
 import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -8,6 +9,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.kuit7th_api_practice.data.mock.PostLocalDataSource
 import com.example.kuit7th_api_practice.data.model.request.PostCreateRequest
+import com.example.kuit7th_api_practice.data.repository.FavoriteRepository
+import com.example.kuit7th_api_practice.data.repository.PostDraftRepository
 import com.example.kuit7th_api_practice.ui.post.state.PostCreateFormState
 import com.example.kuit7th_api_practice.ui.post.state.PostCreateUiState
 import com.example.kuit7th_api_practice.ui.post.state.PostDetailUiState
@@ -21,8 +24,26 @@ import kotlin.runCatching
 
 @HiltViewModel
 class PostViewModel @Inject constructor(
-    private val postLocalDataSource: PostLocalDataSource
+    private val postLocalDataSource: PostLocalDataSource,
+    private val favoriteRepository: FavoriteRepository,
+    private val postDraftRepository: PostDraftRepository
 ) : ViewModel() {
+
+    init {
+        loadDraft()
+    }
+
+    private fun loadDraft() {
+        viewModelScope.launch {
+            val draft = postDraftRepository.getDraft()
+            postCreateFormState = postCreateFormState.copy(
+                author = draft.author,
+                title = draft.title,
+                content = draft.content,
+                selectedImageUri = draft.imageUri
+            )
+        }
+    }
     // TODO: 목록 화면 상태 만들기
     var postListUiState by mutableStateOf<PostListUiState>(PostListUiState.Loading)
         private set
@@ -46,6 +67,11 @@ class PostViewModel @Inject constructor(
             runCatching {
                 postLocalDataSource.getPosts()
             }.onSuccess { posts ->
+                val map = favoriteRepository.getFavorites(posts)
+
+                map.forEach { (key, value) ->
+                    posts.find {it.id == key}?.isFavorite = value
+                }
                 postListUiState = PostListUiState.Success(posts)
             }.onFailure { error ->
                 postListUiState = PostListUiState.Error(
@@ -79,6 +105,15 @@ class PostViewModel @Inject constructor(
             }
         }
     }
+
+    fun onFavoriteClick(postId: Long) {
+        viewModelScope.launch {
+            favoriteRepository.setFavorite(postId)
+
+            getPosts()
+        }
+    }
+
 
     private fun initializeEditForm(
         postId: Long,
@@ -115,6 +150,7 @@ class PostViewModel @Inject constructor(
             }.onSuccess { post ->
                 postCreateUiState = PostCreateUiState.Success(post)
                 postCreateFormState = PostCreateFormState()
+                postDraftRepository.clearDraft()
                 getPosts()
                 onSuccess()
             }.onFailure { error ->
@@ -172,19 +208,31 @@ class PostViewModel @Inject constructor(
     // 게시글 생성 창에서 변수 최신화
     fun onUpdateAuthor(author: String) {
         postCreateFormState = postCreateFormState.copy(author = author)
+        viewModelScope.launch {
+            postDraftRepository.setAuthor(author)
+        }
     }
 
     fun onUpdateTitle(title: String) {
         postCreateFormState = postCreateFormState.copy(title = title)
+        viewModelScope.launch {
+            postDraftRepository.setTitle(title)
+        }
     }
 
     fun onUpdateContent(content: String) {
         postCreateFormState = postCreateFormState.copy(content = content)
+        viewModelScope.launch {
+            postDraftRepository.setContent(content)
+        }
     }
 
     fun onUpdateSelectedImageUri(selectedImageUri: Uri?) {
-        postCreateFormState =
-            postCreateFormState.copy(selectedImageUri = selectedImageUri?.toString())
+        val uriString = selectedImageUri?.toString()
+        postCreateFormState = postCreateFormState.copy(selectedImageUri = uriString)
+        viewModelScope.launch {
+            postDraftRepository.setImageUri(uriString)
+        }
     }
 
     // 게시글 수정 창에서 변수 최신화

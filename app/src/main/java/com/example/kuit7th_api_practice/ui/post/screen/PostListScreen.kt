@@ -22,12 +22,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.kuit7th_api_practice.ui.post.component.PostItem
 import com.example.kuit7th_api_practice.ui.post.state.PostListUiState
 import com.example.kuit7th_api_practice.ui.post.viewmodel.PostViewModel
-import com.example.kuit7th_api_practice.ui.theme.KUIT7th_API_practiceTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -89,7 +87,8 @@ fun PostListScreen(
                     items(uiState.posts, key = { it.id }) { post ->
                         PostItem(
                             post = post,
-                            onClick = { onPostClick(post.id) }
+                            onClick = { onPostClick(post.id) },
+                            onFavoriteClick = { viewModel.onFavoriteClick(post.id) }
                         )
                     }
                 }

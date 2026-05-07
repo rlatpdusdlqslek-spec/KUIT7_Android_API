@@ -7,5 +7,6 @@ data class PostResponse(
     val imageUrl: String?,
     val author: AuthorResponse,
     val createdAt: String,
-    val updatedAt: String
+    val updatedAt: String,
+    var isFavorite: Boolean = false
 )
