@@ -17,10 +17,15 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import com.example.kuit7th_api_practice.data.model.request.PostCreateRequest
+import com.example.kuit7th_api_practice.data.repository.DraftRepository
+import com.example.kuit7th_api_practice.data.repository.FavoriteRepository
+import kotlinx.coroutines.flow.first
 
 @HiltViewModel
 class PostViewModel @Inject constructor(
-    private val postLocalDataSource: PostLocalDataSource
+    private val postLocalDataSource: PostLocalDataSource,
+    private val favoriteRepository: FavoriteRepository,
+    private val draftRepository: DraftRepository
 ) : ViewModel() {
 
     var postListUiState by mutableStateOf<PostListUiState>(value = PostListUiState.Loading)
@@ -37,12 +42,34 @@ class PostViewModel @Inject constructor(
     var isUploadingImage by mutableStateOf(value = false)
         private set
 
+    init {
+        loadDraft()
+    }
+
+    private fun loadDraft() {
+        viewModelScope.launch {
+            val author = draftRepository.getAuthor().first()
+            val title = draftRepository.getTitle().first()
+            val content = draftRepository.getContent().first()
+            postCreateUiState = postCreateUiState.copy(
+                author = author,
+                title = title,
+                content = content
+            )
+        }
+    }
+
     fun getPosts() {
         viewModelScope.launch {
             postListUiState = PostListUiState.Loading
             runCatching {
                 postLocalDataSource.getPosts()
             }.onSuccess { posts ->
+                val map = favoriteRepository.getFavoritePosts(posts)
+
+                map.forEach { key, value ->
+                    posts.find { it.id == key }?.isFavorite = value
+                }
                 postListUiState = PostListUiState.Success(posts)
 
             }.onFailure { error ->
@@ -82,6 +109,14 @@ class PostViewModel @Inject constructor(
         }
     }
 
+    fun onFavoriteClick(postId: Long) {
+        viewModelScope.launch {
+            favoriteRepository.addFavoritePost(postId)
+
+
+            getPosts()
+        }
+    }
 
     private fun initializeEditForm(
         postId: Long,
@@ -93,8 +128,8 @@ class PostViewModel @Inject constructor(
     ) {
         if (!force && postEditFormState.initializedPostId == postId) return
         postEditFormState = PostEditFormState(
-            title=title,
-            content=content,
+            title = title,
+            content = content,
             originalImageUrl = imageUrl,
             selectedImageUri = null,
             initializedPostId = postId
@@ -103,14 +138,25 @@ class PostViewModel @Inject constructor(
     }
 
 
+    fun updateCreateFormState(
+        author: String = postCreateUiState.author,
+        title: String = postCreateUiState.title,
+        content: String = postCreateUiState.content
+    ) {
+        postCreateUiState =
+            postCreateUiState.copy(author = author, title = title, content = content)
 
-
-
-    fun updateCreateFormState(author: String = postCreateUiState.author, title: String = postCreateUiState.title, content: String = postCreateUiState.content) {
-        postCreateUiState = postCreateUiState.copy(author = author, title = title, content = content)
+        viewModelScope.launch {
+            draftRepository.saveAuthor(postCreateUiState.author)
+            draftRepository.saveTitle(postCreateUiState.title)
+            draftRepository.saveContent(postCreateUiState.content)
+        }
     }
 
-    fun updateEditFormState(title: String = postEditFormState.title, content: String = postEditFormState.content) {
+    fun updateEditFormState(
+        title: String = postEditFormState.title,
+        content: String = postEditFormState.content
+    ) {
         postEditFormState = postEditFormState.copy(title = title, content = content)
     }
 
@@ -140,6 +186,9 @@ class PostViewModel @Inject constructor(
                 )
             }.onSuccess {
                 postCreateUiState = PostCreateFormState() // 초기화
+                viewModelScope.launch {
+                    draftRepository.clearDraft()
+                }
                 onSuccess()
             }
         }
@@ -151,7 +200,8 @@ class PostViewModel @Inject constructor(
                 val request = PostCreateRequest(
                     title = postEditFormState.title,
                     content = postEditFormState.content,
-                    imageUrl = postEditFormState.selectedImageUri ?: postEditFormState.originalImageUrl
+                    imageUrl = postEditFormState.selectedImageUri
+                        ?: postEditFormState.originalImageUrl
                 )
                 postLocalDataSource.updatePost(postId, request)
             }.onSuccess {
