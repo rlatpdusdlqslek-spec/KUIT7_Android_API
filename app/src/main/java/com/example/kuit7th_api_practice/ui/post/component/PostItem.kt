@@ -13,8 +13,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -25,22 +23,15 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
-import com.example.kuit7th_api_practice.data.model.response.PostResponse
-import com.example.kuit7th_api_practice.ui.post.screen.PostPracticeSampleData.posts
-import com.example.kuit7th_api_practice.util.formatDateTime
+import com.example.kuit7th_api_practice.domain.repository.model.Post
 
 @Composable
 fun PostItem(
-    post: PostResponse,
-    onClick: () -> Unit,
-    onFavoriteClick: () -> Unit
+    post: Post,
+    onClick: () -> Unit
 ) {
     Card(
         modifier = Modifier
@@ -63,68 +54,35 @@ fun PostItem(
                     modifier = Modifier
                         .padding(horizontal = 20.dp, vertical = 16.dp)
                 ) {
-                    if (post.author.profileImageUrl != null) {
-                        AsyncImage(
-                            model = post.author.profileImageUrl,
-                            contentDescription = "profile",
-                            modifier = Modifier
-                                .size(44.dp)
-                                .clip(CircleShape),
-                            contentScale = ContentScale.Crop
+                    Surface(
+                        modifier = Modifier.size(44.dp),
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primaryContainer
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Person,
+                            contentDescription = null,
+                            modifier = Modifier.padding(10.dp),
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer
                         )
-                    } else {
-                        Surface(
-                            modifier = Modifier.size(44.dp),
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.primaryContainer
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Person,
-                                contentDescription = null,
-                                modifier = Modifier.padding(10.dp),
-                                tint = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                        }
                     }
 
                     Spacer(modifier = Modifier.width(12.dp))
 
                     Column(modifier = Modifier) {
                         Text(
-                            text = post.author.username,
+                            text = "User ${post.userId}",
                             style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = formatDateTime(post.createdAt),
+                            text = "Post #${post.id}",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
-                Icon(
-                    imageVector = if (post.isFavorite) Icons.Default.Favorite
-                    else Icons.Default.FavoriteBorder,
-                    contentDescription = null,
-                    modifier = Modifier
-                        .padding(10.dp)
-                        .clickable {
-                            onFavoriteClick()
-                        },
-                    tint = if (post.isFavorite) Color.Red
-                    else MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            }
-            post.imageUrl?.let { imageUrl ->
-                AsyncImage(
-                    model = imageUrl,
-                    contentDescription = "image",
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(220.dp),
-                    contentScale = ContentScale.Crop
-                )
             }
 
             Column(
@@ -141,7 +99,7 @@ fun PostItem(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Text(
-                    text = post.content,
+                    text = post.body,
                     style = MaterialTheme.typography.bodyLarge,
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis,

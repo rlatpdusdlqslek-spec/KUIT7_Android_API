@@ -6,6 +6,8 @@ import com.example.kuit7th_api_practice.data.repository.FavoriteRepository
 import com.example.kuit7th_api_practice.data.repository.PostDraftRepository
 import com.example.kuit7th_api_practice.data.repositoryimpl.FavoriteRepositoryImpl
 import com.example.kuit7th_api_practice.data.repositoryimpl.PostDraftRepositoryImpl
+import com.example.kuit7th_api_practice.data.repositoryimpl.PostRepositoryImpl
+import com.example.kuit7th_api_practice.domain.repository.PostRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -33,4 +35,10 @@ abstract class PostDataModule {
     abstract fun bindPostDraftRepository(
         repository: PostDraftRepositoryImpl
     ): PostDraftRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindPostRepository(
+        repository: PostRepositoryImpl
+    ): PostRepository
 }

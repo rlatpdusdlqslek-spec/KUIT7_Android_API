@@ -8,12 +8,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -39,16 +35,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
 import com.example.kuit7th_api_practice.ui.post.state.PostDetailUiState
 import com.example.kuit7th_api_practice.ui.post.viewmodel.PostViewModel
-import com.example.kuit7th_api_practice.ui.theme.KUIT7th_API_practiceTheme
-import com.example.kuit7th_api_practice.util.formatDateTime
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -58,12 +48,13 @@ fun PostDetailScreen(
     onEditClick: (Long) -> Unit,
     viewModel: PostViewModel
 ) {
-    // TODO: 실습에서 ViewModel의 상세 상태로 교체
+    // TODO 8주차 미션: 상세 화면 상태도 collect해서 구독하는 구조로 변경하기
     val uiState = viewModel.postDetailUiState
     var showDeleteDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(postId) {
         viewModel.getPostDetail(postId)
+        // TODO 8주차 미션: 삭제 성공 이벤트를 구독해서 뒤로가기 또는 Snackbar를 처리하기
     }
 
     Scaffold(
@@ -72,15 +63,15 @@ fun PostDetailScreen(
                 title = { Text("게시글 상세") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "뒤로 가기")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
                 actions = {
                     IconButton(onClick = { onEditClick(postId) }) {
-                        Icon(Icons.Default.Edit, contentDescription = "수정")
+                        Icon(Icons.Default.Edit, contentDescription = "Edit")
                     }
                     IconButton(onClick = { showDeleteDialog = true }) {
-                        Icon(Icons.Default.Delete, contentDescription = "삭제")
+                        Icon(Icons.Default.Delete, contentDescription = "Delete")
                     }
                 }
             )
@@ -129,57 +120,26 @@ fun PostDetailScreen(
                                 .fillMaxWidth()
                                 .padding(16.dp)
                         ) {
-                            if (post.author.profileImageUrl != null) {
-                                AsyncImage(
-                                    model = post.author.profileImageUrl,
-                                    contentDescription = "프로필 이미지",
-                                    modifier = Modifier
-                                        .size(44.dp)
-                                        .clip(CircleShape),
-                                    contentScale = ContentScale.Crop
-                                )
-                            } else {
-                                Surface(
-                                    modifier = Modifier.size(44.dp),
-                                    shape = CircleShape,
-                                    color = MaterialTheme.colorScheme.primaryContainer
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Person,
-                                        contentDescription = "기본 프로필",
-                                        modifier = Modifier.padding(10.dp),
-                                        tint = MaterialTheme.colorScheme.onPrimaryContainer
-                                    )
-                                }
-                            }
+                            Icon(
+                                imageVector = Icons.Default.Person,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
 
-                            Spacer(modifier = Modifier.width(12.dp))
-
-                            Column {
+                            Column(modifier = Modifier.padding(start = 12.dp)) {
                                 Text(
-                                    text = post.author.username,
+                                    text = "User ${post.userId}",
                                     style = MaterialTheme.typography.bodyLarge.copy(
                                         fontWeight = FontWeight.SemiBold
                                     )
                                 )
                                 Text(
-                                    text = formatDateTime(post.createdAt),
+                                    text = "Post #${post.id}",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
-                    }
-
-                    post.imageUrl?.let { imageUrl ->
-                        AsyncImage(
-                            model = imageUrl,
-                            contentDescription = "게시글 이미지",
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(max = 400.dp),
-                            contentScale = ContentScale.Fit
-                        )
                     }
 
                     Column(modifier = Modifier.padding(20.dp)) {
@@ -193,7 +153,7 @@ fun PostDetailScreen(
                         Spacer(modifier = Modifier.height(16.dp))
 
                         Text(
-                            text = post.content,
+                            text = post.body,
                             style = MaterialTheme.typography.bodyLarge,
                             lineHeight = MaterialTheme.typography.bodyLarge.lineHeight
                         )
@@ -203,28 +163,27 @@ fun PostDetailScreen(
         }
     }
 
-    // 게시글 삭제 시 dialog 띄움
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
-            title = { Text("게시글 삭제") },
-            text = { Text("정말로 이 게시글을 삭제하시겠습니까?") },
+            title = { Text("Delete Post") },
+            text = { Text("Delete this post?") },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        // TODO: deletePost()와 연결
                         viewModel.deletePost(postId) {
+                            // TODO 8주차 미션: 이 콜백을 화면 이벤트 흐름으로 대체하기
                             showDeleteDialog = false
                             onNavigateBack()
                         }
                     }
                 ) {
-                    Text("삭제")
+                    Text("Delete")
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteDialog = false }) {
-                    Text("취소")
+                    Text("Cancel")
                 }
             }
         )

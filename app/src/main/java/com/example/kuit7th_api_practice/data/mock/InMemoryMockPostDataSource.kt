@@ -60,10 +60,10 @@ class InMemoryMockPostDataSource @Inject constructor() : PostLocalDataSource {
         val post = PostResponse(
             id = nextId++,
             title = request.title,
-            content = request.content,
-            imageUrl = request.imageUrl,
+            content = request.body,
+            imageUrl = null,
             author = AuthorResponse(
-                id = System.currentTimeMillis(),
+                id = request.userId.toLong(),
                 username = authorName.ifBlank { "anonymous" },
                 profileImageUrl = null
             ),
@@ -84,8 +84,7 @@ class InMemoryMockPostDataSource @Inject constructor() : PostLocalDataSource {
         val current = posts[index]
         val updated = current.copy(
             title = request.title,
-            content = request.content,
-            imageUrl = request.imageUrl,
+            content = request.body,
             updatedAt = nowString()
         )
 
