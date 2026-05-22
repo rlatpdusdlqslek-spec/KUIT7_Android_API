@@ -13,8 +13,18 @@ import com.example.kuit7th_api_practice.ui.post.state.PostCreateUiState
 import com.example.kuit7th_api_practice.ui.post.state.PostDetailUiState
 import com.example.kuit7th_api_practice.ui.post.state.PostEditFormState
 import com.example.kuit7th_api_practice.ui.post.state.PostEditUiState
+import com.example.kuit7th_api_practice.ui.post.state.PostEvent
 import com.example.kuit7th_api_practice.ui.post.state.PostUiState
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -23,30 +33,32 @@ class PostViewModel @Inject constructor(
     private val postRepository: PostRepository
 ) : ViewModel() {
 
-    // TODO 8주차 실습: mutableStateOf 상태를 ViewModel 내부 수정용 상태와 UI 공개용 상태로 분리하기
-    // TODO 8주차 실습: UI는 읽기만 가능하고 ViewModel만 상태를 변경할 수 있도록 구조 바꾸기
-    var uiState by mutableStateOf<PostUiState>(PostUiState.Idle)
-        private set
+    //TODO 8주차 실습: UI는 읽기만 가능하고 ViewModel만 상태를 변경할 수 있도록 구조 바꾸기
+    private val _uiState = MutableStateFlow<PostUiState>(PostUiState.Idle)
+    val uiState: StateFlow<PostUiState> = _uiState.asStateFlow()
 
     // TODO 8주차 미션: 상세 화면 상태도 같은 방식으로 화면 상태 스트림으로 관리하기
-    var postDetailUiState by mutableStateOf<PostDetailUiState>(PostDetailUiState.Loading)
-        private set
+    private val _postDetailUiState = MutableStateFlow<PostDetailUiState>(PostDetailUiState.Loading)
+    val postDetailUiState: StateFlow<PostDetailUiState> = _postDetailUiState.asStateFlow()
 
     // TODO 8주차 실습, 미션: 작성/수정 성공 후 화면 이동 같은 1회성 동작은 상태가 아니라 이벤트로 분리하기
-    var postCreateUiState by mutableStateOf<PostCreateUiState>(PostCreateUiState.Idle)
-        private set
+    private val _postCreateUiState = MutableStateFlow<PostCreateUiState>(PostCreateUiState.Idle)
+    val postCreateUiState: StateFlow<PostCreateUiState> = _postCreateUiState.asStateFlow()
 
-    var postEditUiState by mutableStateOf<PostEditUiState>(PostEditUiState.Loading)
-        private set
+    private val _postEditUiState = MutableStateFlow<PostEditUiState>(PostEditUiState.Loading)
+    val postEditUiState: StateFlow<PostEditUiState> = _postEditUiState.asStateFlow()
 
-    var postCreateFormState by mutableStateOf(PostCreateFormState())
-        private set
+    private val _postCreateFormState = MutableStateFlow(PostCreateFormState())
+    var postCreateFormState: StateFlow<PostCreateFormState> = _postCreateFormState.asStateFlow()
 
-    var postEditFormState by mutableStateOf(PostEditFormState())
-        private set
+    private val _postEditFormState = MutableStateFlow(PostEditFormState())
+    var postEditFormState: StateFlow<PostEditFormState> = _postEditFormState.asStateFlow()
 
-    var isUploading by mutableStateOf(false)
-        private set
+    private val _isUploading = MutableStateFlow(false)
+    var isUploading: StateFlow<Boolean> = _isUploading.asStateFlow()
+
+    private val _eventFlow = MutableSharedFlow<PostEvent>()
+    val eventFlow: SharedFlow<PostEvent> = _eventFlow.asSharedFlow()
 
     private val createdPosts = mutableMapOf<Int, Post>()
     private val updatedPosts = mutableMapOf<Int, Post>()
@@ -54,25 +66,26 @@ class PostViewModel @Inject constructor(
 
     fun fetchPosts(userId: Int? = null) {
         // TODO 8주차 실습: Loading 상태를 UI 상태 스트림에 반영하기
-        uiState = PostUiState.Loading
+        _uiState.value = PostUiState.Loading
 
         viewModelScope.launch {
             // TODO 8주차 실습: Repository의 Flow를 collect해서 Success 상태로 변환하기
             // TODO 8주차 실습: catch 또는 runCatching 위치를 비교하며 에러 처리 흐름 이해하기
-            runCatching {
-                postRepository.getPosts(userId)
-            }.onSuccess { posts ->
-                uiState = PostUiState.Success(applyLocalChanges(posts, userId))
-            }.onFailure { error ->
-                uiState = PostUiState.Error(error.message ?: "Unknown error")
-            }
+            postRepository.getPosts(userId)
+                .map { posts -> applyLocalChanges(posts, userId) }
+                .catch { error ->
+                    _uiState.value = PostUiState.Error(error.message ?: "Unknown error")
+                }
+                .collect { posts ->
+                    _uiState.value = PostUiState.Success(posts)
+                }
         }
     }
 
     fun getPostDetail(postId: Long) {
         // TODO 8주차 미션: 상세 상태도 Loading, Success, Error 흐름으로 관리하기
-        postDetailUiState = PostDetailUiState.Loading
-        postEditUiState = PostEditUiState.Loading
+        _postDetailUiState.value = PostDetailUiState.Loading
+        _postEditUiState.value = PostEditUiState.Loading
 
         val localPost = findLocalPost(postId.toInt())
         if (localPost != null) {
@@ -82,83 +95,89 @@ class PostViewModel @Inject constructor(
 
         if (deletedPostIds.contains(postId.toInt())) {
             val message = "Deleted post."
-            postDetailUiState = PostDetailUiState.Error(message)
-            postEditUiState = PostEditUiState.Error(message)
+            _postDetailUiState.value = PostDetailUiState.Error(message)
+            _postEditUiState.value = PostEditUiState.Error(message)
             return
         }
 
         viewModelScope.launch {
             runCatching {
-                postRepository.getPost(postId.toInt())
+                postRepository.getPost(postId.toInt()).first()
             }.onSuccess { post ->
                 showPostDetail(post)
             }.onFailure { error ->
                 val message = error.message ?: "Failed to load post."
-                postDetailUiState = PostDetailUiState.Error(message)
-                postEditUiState = PostEditUiState.Error(message)
+                _postDetailUiState.value = PostDetailUiState.Error(message)
+                _postEditUiState.value = PostEditUiState.Error(message)
             }
         }
     }
 
-    fun createPost(onSuccess: () -> Unit) {
+    fun createPost() {
         viewModelScope.launch {
-            isUploading = true
-            postCreateUiState = PostCreateUiState.Saving
+            _isUploading.value = true
+            _postCreateUiState.value = PostCreateUiState.Saving
 
             // TODO 8주차 실습: onSuccess 콜백 대신 저장 완료 이벤트를 방출하도록 바꾸기
             // TODO 8주차 실습: Toast, Snackbar, Navigation처럼 한 번만 처리할 동작을 이벤트로 분리하기
             runCatching {
+                val formState = _postCreateFormState.value
                 postRepository.createPost(
-                    title = postCreateFormState.title,
-                    body = postCreateFormState.content,
-                    userId = postCreateFormState.author.toIntOrNull() ?: 1
+                    title = formState.title,
+                    body = formState.content,
+                    userId = formState.author.toIntOrNull() ?: 1
                 )
             }.onSuccess { post ->
                 createdPosts[post.id] = post
-                postCreateUiState = PostCreateUiState.Success(post)
-                postCreateFormState = PostCreateFormState()
+                _postCreateUiState.value = PostCreateUiState.Success(post)
+                _postCreateFormState.value = PostCreateFormState()
                 addOrReplacePostInList(post)
-                onSuccess()
+                _eventFlow.emit(PostEvent.NavigateBack)
             }.onFailure { error ->
-                postCreateUiState = PostCreateUiState.Error(
-                    error.message ?: "Failed to create post."
+                val message = error.message ?: "Failed to create post."
+                _postCreateUiState.value = PostCreateUiState.Error(
+                    message
                 )
             }
 
-            isUploading = false
+            _isUploading.value = false
         }
     }
 
-    fun updatePost(postId: Long, onSuccess: () -> Unit) {
+    fun updatePost(postId: Long) {
         viewModelScope.launch {
-            isUploading = true
-            postEditUiState = PostEditUiState.Saving
+            _isUploading.value = true
+            _postEditUiState.value = PostEditUiState.Saving
 
             // TODO 8주차 미션: 수정 성공 후 뒤로가기 처리를 1회성 이벤트로 분리하기
             runCatching {
+                val formState = _postEditFormState.value
                 postRepository.updatePost(
                     id = postId.toInt(),
-                    title = postEditFormState.title,
-                    body = postEditFormState.body,
-                    userId = postEditFormState.userId
+                    title = formState.title,
+                    body = formState.body,
+                    userId = formState.userId
                 )
             }.onSuccess { post ->
                 updatedPosts[post.id] = post
-                postEditUiState = PostEditUiState.Success(post)
-                postDetailUiState = PostDetailUiState.Success(post)
+                _postEditUiState.value = PostEditUiState.Success(post)
+                _postDetailUiState.value = PostDetailUiState.Success(post)
                 addOrReplacePostInList(post)
-                onSuccess()
+                _eventFlow.emit(PostEvent.NavigateBack)
+
             }.onFailure { error ->
-                postEditUiState = PostEditUiState.Error(
-                    error.message ?: "Failed to update post."
+                val message = error.message ?: "Failed to update post."
+                _postEditUiState.value = PostEditUiState.Error(
+                    message
                 )
+                _eventFlow.emit(PostEvent.ShowSnackbar(message))
             }
 
-            isUploading = false
+            _isUploading.value = false
         }
     }
 
-    fun deletePost(postId: Long, onSuccess: () -> Unit) {
+    fun deletePost(postId: Long) {
         viewModelScope.launch {
             // TODO 8주차 미션: 삭제 성공 후 화면 이동 또는 Snackbar 표시를 이벤트로 분리하기
             runCatching {
@@ -168,39 +187,44 @@ class PostViewModel @Inject constructor(
                 createdPosts.remove(postId.toInt())
                 updatedPosts.remove(postId.toInt())
                 removePostFromList(postId.toInt())
-                onSuccess()
+
+                _eventFlow.emit(PostEvent.NavigateBack)
+
+
             }.onFailure { error ->
-                postDetailUiState = PostDetailUiState.Error(
-                    error.message ?: "Failed to delete post."
-                )
+                val message = error.message ?: "Failed to delete post."
+                _postDetailUiState.value = PostDetailUiState.Error(message)
+                _eventFlow.emit(PostEvent.ShowSnackbar(message))
             }
+            _isUploading.value = false
         }
     }
 
+
     fun onUpdateAuthor(author: String) {
-        postCreateFormState = postCreateFormState.copy(author = author)
+        _postCreateFormState.value = _postCreateFormState.value.copy(author = author)
     }
 
     fun onUpdateTitle(title: String) {
-        postCreateFormState = postCreateFormState.copy(title = title)
+        _postCreateFormState.value = _postCreateFormState.value.copy(title = title)
     }
 
     fun onUpdateContent(content: String) {
-        postCreateFormState = postCreateFormState.copy(content = content)
+        _postCreateFormState.value = _postCreateFormState.value.copy(content = content)
     }
 
     fun onUpdateSelectedImageUri(selectedImageUri: Uri?) {
-        postCreateFormState = postCreateFormState.copy(
+        _postCreateFormState.value = _postCreateFormState.value.copy(
             selectedImageUri = selectedImageUri?.toString()
         )
     }
 
     fun onUpdateEditTitle(title: String) {
-        postEditFormState = postEditFormState.copy(title = title)
+        _postEditFormState.value = _postEditFormState.value.copy(title = title)
     }
 
     fun onUpdateEditContent(content: String) {
-        postEditFormState = postEditFormState.copy(body = content)
+        _postEditFormState.value = _postEditFormState.value.copy(body = content)
     }
 
     fun onUpdateEditSelectedImageUri(selectedImageUri: Uri?) = Unit
@@ -214,9 +238,9 @@ class PostViewModel @Inject constructor(
         userId: Int,
         force: Boolean = false
     ) {
-        if (!force && postEditFormState.initializedPostId == postId) return
+        if (!force && _postEditFormState.value.initializedPostId == postId) return
 
-        postEditFormState = PostEditFormState(
+        _postEditFormState.value = PostEditFormState(
             title = title,
             body = body,
             userId = userId,
@@ -225,8 +249,8 @@ class PostViewModel @Inject constructor(
     }
 
     private fun showPostDetail(post: Post) {
-        postDetailUiState = PostDetailUiState.Success(post)
-        postEditUiState = PostEditUiState.Ready(post)
+        _postDetailUiState.value = PostDetailUiState.Success(post)
+        _postEditUiState.value = PostEditUiState.Ready(post)
         initializeEditForm(
             postId = post.id,
             title = post.title,
@@ -246,6 +270,7 @@ class PostViewModel @Inject constructor(
         val localCreatedPosts = createdPosts.values
             .filterNot { deletedPostIds.contains(it.id) }
             .filter { userId == null || it.userId == userId }
+            .map {post ->updatedPosts[post.id] ?: post}
 
         return (localCreatedPosts + serverPosts)
             .distinctBy { it.id }
@@ -259,7 +284,7 @@ class PostViewModel @Inject constructor(
         val posts = currentState.posts
             .filterNot { it.id == post.id }
 
-        uiState = PostUiState.Success(
+        _uiState.value = PostUiState.Success(
             (listOf(post) + posts)
                 .filterNot { deletedPostIds.contains(it.id) }
                 .sortedByDescending { it.id }
@@ -269,7 +294,7 @@ class PostViewModel @Inject constructor(
     private fun removePostFromList(postId: Int) {
         val currentState = uiState
         if (currentState is PostUiState.Success) {
-            uiState = PostUiState.Success(
+            _uiState.value = PostUiState.Success(
                 currentState.posts.filterNot { it.id == postId }
             )
         }

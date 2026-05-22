@@ -20,9 +20,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.kuit7th_api_practice.ui.post.component.PostItem
 import com.example.kuit7th_api_practice.ui.post.state.PostUiState
 import com.example.kuit7th_api_practice.ui.post.viewmodel.PostViewModel
@@ -36,7 +38,7 @@ fun PostListScreen(
 ) {
     // TODO 8주차 실습: ViewModel의 화면 상태 스트림을 collect해서 Compose State로 변환하기
     // TODO 8주차 실습: 상태가 바뀌면 아래 when 구문이 자동으로 다시 그려지는지 확인하기
-    val uiState = viewModel.uiState
+   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
 
     LaunchedEffect(Unit) {

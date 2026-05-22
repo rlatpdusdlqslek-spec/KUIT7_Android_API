@@ -1,5 +1,6 @@
 package com.example.kuit7th_api_practice.ui.post.screen
 
+import android.R.attr.title
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -21,13 +22,19 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.kuit7th_api_practice.ui.post.state.PostEvent
 import com.example.kuit7th_api_practice.ui.post.viewmodel.PostViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -38,11 +45,19 @@ fun PostCreateScreen(
     viewModel: PostViewModel
 ) {
     // TODO 8주차 실습: 작성 폼 상태를 화면 상태 스트림으로 관찰하는 구조로 바꿔보기
-    val userId = viewModel.postCreateFormState.author
-    val title = viewModel.postCreateFormState.title
-    val body = viewModel.postCreateFormState.content
-    val isUploading = viewModel.isUploading
+    val formState by viewModel.postCreateFormState.collectAsStateWithLifecycle()
+    val isUploading by viewModel.isUploading.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
 
+    LaunchedEffect(Unit) {
+        viewModel.eventFlow.collect { event ->
+            when (event) {
+                is PostEvent.NavigateBack -> onNavigateBack()
+                is PostEvent.ShowSnackbar -> snackbarHostState.showSnackbar(event.message)
+            }
+        }
+
+    }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -72,7 +87,7 @@ fun PostCreateScreen(
                 .padding(20.dp)
         ) {
             OutlinedTextField(
-                value = userId,
+                value = formState.author,
                 onValueChange = { viewModel.onUpdateAuthor(it) },
                 label = { Text("User ID") },
                 placeholder = { Text("1") },
@@ -85,7 +100,7 @@ fun PostCreateScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             OutlinedTextField(
-                value = title,
+                value = formState.title,
                 onValueChange = { viewModel.onUpdateTitle(it) },
                 label = { Text("Title") },
                 modifier = Modifier.fillMaxWidth(),
@@ -97,7 +112,7 @@ fun PostCreateScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             OutlinedTextField(
-                value = body,
+                value = formState.content,
                 onValueChange = { viewModel.onUpdateContent(it) },
                 label = { Text("Body") },
                 modifier = Modifier
@@ -112,15 +127,13 @@ fun PostCreateScreen(
 
             Button(
                 onClick = {
-                    viewModel.createPost {
-                        // TODO 8주차 실습: 작성 성공 콜백을 1회성 이벤트 흐름으로 대체하기
-                        onPostCreated()
-                    }
+                    viewModel.createPost()
+
                 },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
-                enabled = title.isNotBlank() && body.isNotBlank() && !isUploading,
+                enabled = formState.title.isNotBlank() && formState.content.isNotBlank() && !isUploading,
                 shape = RoundedCornerShape(16.dp),
                 elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
             ) {

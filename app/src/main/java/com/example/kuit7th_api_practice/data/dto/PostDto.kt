@@ -6,13 +6,13 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class PostDto(
     val userId: Int,
-    val id: Int,
+    val id: Int? = null,
     val title: String,
     val body: String
 )
 
-fun PostDto.toDomain(): Post = Post(
-    id = id,
+fun PostDto.toDomain(fallId: Int = -1): Post = Post(
+    id = id?: fallId,
     userId = userId,
     title = title,
     body = body
